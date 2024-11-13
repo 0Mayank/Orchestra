@@ -67,7 +67,7 @@ func main() {
 	router := gin.Default()
 
 	bconn, err := grpc.NewClient(
-		"localhost:50053",
+		fmt.Sprintf("%v:%v", BOOKING_HOST, BOOKING_PORT),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	defer bconn.Close()
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	aconn, err := grpc.NewClient(
-		"localhost:50053",
+		fmt.Sprintf("%v:%v", AUTH_HOST, AUTH_PORT),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	defer bconn.Close()
@@ -89,7 +89,7 @@ func main() {
 	}
 
 	pconn, err := grpc.NewClient(
-		"localhost:50053",
+		fmt.Sprintf("%v:%v", PAYMENT_HOST, PAYMENT_PORT),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	defer bconn.Close()
