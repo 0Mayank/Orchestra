@@ -27,7 +27,11 @@ var PAYMENT_PORT int64
 var AUTH_HOST string
 var AUTH_PORT int64
 
+var ROOM_TYPE_MAP map[int32]string
+
 func main() {
+	ROOM_TYPE_MAP = map[int32]string{1: "Single", 2: "Couple"}
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
@@ -107,6 +111,7 @@ func main() {
 
 	router.POST("/api/book/createBooking", handleCreateBooking(&bclient))
 	router.GET("/api/book/getAllBookings", handleGetAllBookings(&bclient))
+	router.POST("/api/book/checkAvailable", handleCheckAvailable(&bclient))
 
 	router.POST("/api/payment/makePayment", handleMakePayment(&pclient))
 
@@ -211,6 +216,59 @@ func handleLogin(client *pauths.AuthServiceClient) func(c *gin.Context) {
 	}
 }
 
+func handleCheckAvailable(client *pbooking.BookingServiceClient) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var body struct {
+			RoomType     int32  `json:"room_type"`
+			CheckInDate  string `json:"check_in_date"`
+			CheckOutDate string `json:"check_out_date"`
+		}
+
+		err := c.ShouldBindJSON(&body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"msg": err.Error()})
+			return
+		}
+
+		req := pbooking.GetRoomsRequest{
+			HotelId:      HOTEL_ID,
+			CheckInDate:  body.CheckInDate,
+			CheckOutDate: body.CheckOutDate,
+		}
+		response, err := (*client).GetRooms(c, &req)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"msg": "No Rooms Available"})
+			return
+		}
+
+		var selectedRoom *pbooking.RoomInfo
+		for _, room := range response.Rooms {
+			if room.RoomType == body.RoomType && room.Available {
+				selectedRoom = room
+				break
+			}
+		}
+
+		if selectedRoom == nil {
+			c.JSON(
+				http.StatusInternalServerError,
+				gin.H{
+					"msg": fmt.Sprintf(
+						"No rooms available for type: %v",
+						ROOM_TYPE_MAP[body.RoomType],
+					),
+				},
+			)
+			return
+		}
+
+		c.JSON(
+			http.StatusOK,
+			gin.H{"room_id": selectedRoom.RoomId, "room_number": selectedRoom.RoomNumber},
+		)
+	}
+}
+
 func handleCreateBooking(client *pbooking.BookingServiceClient) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		var body struct {
@@ -234,7 +292,7 @@ func handleCreateBooking(client *pbooking.BookingServiceClient) func(c *gin.Cont
 		}
 		response, err := (*client).GetRooms(c, &req)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"msg": "No Room Available"})
+			c.JSON(http.StatusInternalServerError, gin.H{"msg": "No Rooms Available"})
 			return
 		}
 
@@ -249,7 +307,12 @@ func handleCreateBooking(client *pbooking.BookingServiceClient) func(c *gin.Cont
 		if selectedRoom == nil {
 			c.JSON(
 				http.StatusInternalServerError,
-				gin.H{"msg": "No rooms available for the requested type"},
+				gin.H{
+					"msg": fmt.Sprintf(
+						"No rooms available for type: %v",
+						ROOM_TYPE_MAP[body.RoomType],
+					),
+				},
 			)
 			return
 		}
