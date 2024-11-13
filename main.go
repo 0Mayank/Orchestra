@@ -19,7 +19,6 @@ import (
 
 var CLIENT_ID string
 var HOTEL_ID int64
-var PAYMENT_ID string
 var PORT int64
 var BOOKING_HOST string
 var BOOKING_PORT int64
@@ -40,7 +39,6 @@ func main() {
 		log.Fatalf("Error loading HOTEL_ID: %v", err)
 	}
 
-	PAYMENT_ID = os.Getenv("PAYMENT_ID")
 	PORT, err = strconv.ParseInt(os.Getenv("PORT"), 10, 64)
 	if err != nil {
 		log.Fatalf("Error loading PORT: %v", err)
