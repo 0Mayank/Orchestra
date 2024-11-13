@@ -63,6 +63,7 @@ func main() {
 	}
 
 	router := gin.Default()
+	router.Use(cors.Default())
 
 	bconn, err := grpc.NewClient(
 		fmt.Sprintf("%v:%v", BOOKING_HOST, BOOKING_PORT),
@@ -104,12 +105,11 @@ func main() {
 	router.POST("/api/register", handleRegister(&aclient))
 	router.POST("/api/login", handleLogin(&aclient))
 
-	router.GET("/api/book/createBooking", handleCreateBooking(&bclient))
-	router.POST("/api/book/getAllBookings", handleGetAllBookings(&bclient))
+	router.POST("/api/book/createBooking", handleCreateBooking(&bclient))
+	router.GET("/api/book/getAllBookings", handleGetAllBookings(&bclient))
 
 	router.POST("/api/payment/makePayment", handleMakePayment(&pclient))
 
-	router.Use(cors.Default())
 	log.Fatal(router.Run(":8080"))
 }
 
@@ -131,8 +131,8 @@ func handleMakePayment(client *ppayment.PaymentServiceClient) func(c *gin.Contex
 		req := ppayment.CreatePaymentRequest{
 			UserId:   body.Email,
 			Amount:   body.Amount,
-			Currency: "USD",  // Assuming currency is USD, change if needed
-			Method:   "card", // Assuming method is card, change if needed
+			Currency: "INR",
+			Method:   "card",
 		}
 
 		response, err := (*client).CreatePayment(c, &req)
@@ -141,8 +141,8 @@ func handleMakePayment(client *ppayment.PaymentServiceClient) func(c *gin.Contex
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"payment_id": response.PaymentId,
-			"message":    response.Message,
+			"transaction_id": response.PaymentId,
+			"message":        response.Message,
 		})
 	}
 }
@@ -216,7 +216,7 @@ func handleCreateBooking(client *pbooking.BookingServiceClient) func(c *gin.Cont
 		var body struct {
 			CustomerName  string `json:"customer_name"`
 			CustomerEmail string `json:"customer_email"`
-			TransactionID int64  `json:"transaction_id"`
+			TransactionID string `json:"transaction_id"`
 			RoomType      int32  `json:"room_type"`
 			CheckInDate   string `json:"check_in_date"`
 			CheckOutDate  string `json:"check_out_date"`
@@ -234,7 +234,7 @@ func handleCreateBooking(client *pbooking.BookingServiceClient) func(c *gin.Cont
 		}
 		response, err := (*client).GetRooms(c, &req)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"msg": "No Room Available"})
+			c.JSON(http.StatusInternalServerError, gin.H{"msg": "No Room Available"})
 			return
 		}
 
@@ -248,7 +248,7 @@ func handleCreateBooking(client *pbooking.BookingServiceClient) func(c *gin.Cont
 
 		if selectedRoom == nil {
 			c.JSON(
-				http.StatusNotFound,
+				http.StatusInternalServerError,
 				gin.H{"msg": "No rooms available for the requested type"},
 			)
 			return
@@ -278,7 +278,7 @@ func handleCreateBooking(client *pbooking.BookingServiceClient) func(c *gin.Cont
 
 func handleGetAllBookings(client *pbooking.BookingServiceClient) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		customerEmail := c.Query("customer_email")
+		customerEmail := c.Query("email")
 		req := pbooking.ListCustomerBookingsRequest{
 			CustomerEmail: customerEmail,
 			HotelId:       HOTEL_ID,
@@ -288,6 +288,6 @@ func handleGetAllBookings(client *pbooking.BookingServiceClient) func(c *gin.Con
 			c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, response.Bookings)
+		c.JSON(http.StatusOK, gin.H{"bookings": response.Bookings})
 	}
 }
